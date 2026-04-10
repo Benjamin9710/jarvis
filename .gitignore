@@ -1,0 +1,52 @@
+# macOS
+.DS_Store
+
+# Editors / IDEs
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.template
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+coverage.xml
+htmlcov/
+dist/
+*.egg-info/
+
+# Swift / Xcode
+DerivedData/
+.build/
+.swiftpm/
+.artifacts/
+build/
+*.xcuserdata/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+*.xcresult
+
+# JavaScript package managers (future-proof)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
