@@ -9,6 +9,9 @@
 # Logs
 *.log
 
+# Local tooling caches and downloaded runtimes
+.cache/
+
 # Environment and secrets
 .env
 .env.*

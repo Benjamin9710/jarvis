@@ -18,6 +18,7 @@
 		A10000000000000000000048 /* HUDComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000031 /* HUDComponents.swift */; };
 		A10000000000000000000049 /* VoiceCaptureViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000032 /* VoiceCaptureViewModelTests.swift */; };
 		A1000000000000000000004A /* JarvisIOSUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000033 /* JarvisIOSUITests.swift */; };
+		A1000000000000000000004B /* BackendTranscriptionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000037 /* BackendTranscriptionClient.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -49,6 +50,7 @@
 		A10000000000000000000031 /* HUDComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDComponents.swift; sourceTree = "<group>"; };
 		A10000000000000000000032 /* VoiceCaptureViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCaptureViewModelTests.swift; sourceTree = "<group>"; };
 		A10000000000000000000033 /* JarvisIOSUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarvisIOSUITests.swift; sourceTree = "<group>"; };
+		A10000000000000000000037 /* BackendTranscriptionClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendTranscriptionClient.swift; sourceTree = "<group>"; };
 		A10000000000000000000034 /* JarvisIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = JarvisIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000035 /* JarvisIOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = JarvisIOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000036 /* JarvisIOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = JarvisIOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -146,6 +148,7 @@
 		A10000000000000000000025 /* Voice */ = {
 			isa = PBXGroup;
 			children = (
+				A10000000000000000000037 /* BackendTranscriptionClient.swift */,
 				A1000000000000000000002D /* VoiceCaptureModels.swift */,
 				A1000000000000000000002E /* VoiceCaptureService.swift */,
 				A1000000000000000000002F /* MockVoiceCaptureService.swift */,
@@ -314,6 +317,7 @@
 				A10000000000000000000044 /* VoiceCaptureModels.swift in Sources */,
 				A10000000000000000000045 /* VoiceCaptureService.swift in Sources */,
 				A10000000000000000000046 /* MockVoiceCaptureService.swift in Sources */,
+				A1000000000000000000004B /* BackendTranscriptionClient.swift in Sources */,
 				A10000000000000000000047 /* JarvisTheme.swift in Sources */,
 				A10000000000000000000048 /* HUDComponents.swift in Sources */,
 			);
@@ -360,7 +364,9 @@
 				ENABLE_TESTABILITY = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Jarvis needs local network access to reach your home transcription backend.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Jarvis needs microphone access to capture voice input.";
+				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -387,7 +393,9 @@
 				DEVELOPMENT_TEAM = LAC77W2WLZ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Jarvis needs local network access to reach your home transcription backend.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Jarvis needs microphone access to capture voice input.";
+				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

@@ -79,6 +79,23 @@
             ReferencedContainer = "container:JarvisIOS.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <EnvironmentVariables>
+         <EnvironmentVariable
+            key = "JARVIS_CORE_API_BASE_URL"
+            value = "http://192.168.0.173:8010"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "JARVIS_API_BEARER_TOKEN"
+            value = "change-me"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "JARVIS_DEVICE_NAME"
+            value = "local-iphone"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+      </EnvironmentVariables>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"

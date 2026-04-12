@@ -1,0 +1,29 @@
+[project]
+name = "jarvis-core-api"
+version = "0.1.0"
+description = "Local FastAPI entrypoint for Jarvis voice transcription."
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "jarvis-voice",
+  "pydantic-settings>=2.8,<3",
+  "python-multipart>=0.0.9,<1",
+  "uvicorn>=0.34,<1",
+]
+
+[dependency-groups]
+dev = [
+  "httpx>=0.28,<1",
+  "pyright>=1.1.408,<2",
+  "pytest>=8.3,<9",
+]
+
+[tool.uv.sources]
+jarvis-voice = { path = "../voice", editable = true }
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]

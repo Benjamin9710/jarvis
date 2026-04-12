@@ -8,15 +8,17 @@
 - `UI/` theme and shared HUD components.
 
 ## Behavior Invariants
-- Mission control must reach capture start/stop flows without backend dependencies.
+- Mission control must keep microphone capture separate from backend upload/transcription concerns.
 - `VoiceCaptureViewModel` is the state authority for user-facing capture states.
 - Real microphone access stays isolated in `VoiceCaptureService`.
+- Real HTTP upload stays isolated in the backend transcription client.
 - UI tests must work via `MockVoiceCaptureService` scenario injection.
 
 ## UI Testability
 - Keep stable accessibility identifiers for tappable controls.
 - Keep headline/state text deterministic per capture state.
 - Supported test scenarios are `ready`, `permission-needed`, `recording`, `error`.
+- Backend UI test behavior is selected with `JARVIS_TRANSCRIPTION_SCENARIO`.
 
 ## Change Guidance
 - If adding a new capture state, update:
@@ -24,4 +26,5 @@
   - view-model labels/actions
   - unit tests
   - UI launch scenarios and assertions
+- If changing the upload/transcription path, update mock backend scenarios and transcript-panel assertions alongside the view-model.
 - Keep styling centralized in `UI/JarvisTheme.swift` and HUD components.

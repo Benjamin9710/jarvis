@@ -8,9 +8,22 @@ This package should contain FastAPI app modules and orchestration wiring.
 - request/response models
 - dependency wiring
 - startup and configuration
+- auth enforcement
+- error normalization
+- local request telemetry
 
-## Future Test Guidance
-When code lands, add pytest coverage in this boundary for:
+## Test Guidance
+Add pytest coverage in this boundary for:
 - route behavior
 - orchestration flow
 - error normalization
+- auth enforcement
+- dependency overrides for fake speech adapters
+
+## API Invariants
+- When a route documents `ErrorResponse`, all failure paths for that route, including auth/dependency failures, must return the same top-level JSON shape.
+- Do not raise `HTTPException(detail=...)` for contract-bound API errors unless the serialized response still matches the documented schema.
+- Use a shared app-level helper for contract-bound error responses; do not hand-build the same error JSON in multiple modules.
+- Authorization parsing must follow HTTP semantics, including case-insensitive auth scheme handling.
+- Add or update tests for both success and failure contract shape whenever auth or dependency behavior changes.
+- Keep backend trace logs metadata-only by default; do not write raw audio bytes or transcript text into the local JSONL log.

@@ -1,58 +1,133 @@
 import XCTest
+
 @testable import JarvisIOS
 
 @MainActor
 final class VoiceCaptureViewModelTests: XCTestCase {
-    func testPrepareMapsUnknownPermissionToPermissionNeeded() async {
-        let service = MockVoiceCaptureService(permissionState: .unknown, initialState: .idle)
-        let viewModel = VoiceCaptureViewModel(service: service)
+  func testPrepareMapsUnknownPermissionToPermissionNeeded() async {
+    let service = MockVoiceCaptureService(permissionState: .unknown, initialState: .idle)
+    let viewModel = VoiceCaptureViewModel(
+      service: service,
+      transcriptionClient: MockBackendTranscriptionClient(delayNanoseconds: 0),
+      backendConfiguration: nil
+    )
 
-        await viewModel.prepare()
+    await viewModel.prepare()
 
-        XCTAssertEqual(viewModel.permissionState, .unknown)
-        XCTAssertEqual(viewModel.captureState, .permissionNeeded)
-    }
+    XCTAssertEqual(viewModel.permissionState, .unknown)
+    XCTAssertEqual(viewModel.captureState, .permissionNeeded)
+  }
 
-    func testPrimaryActionRequestsPermissionAndStartsCapture() async {
-        let service = MockVoiceCaptureService(
-            permissionState: .unknown,
-            initialState: .permissionNeeded,
-            permissionRequestResult: .granted
+  func testPrimaryActionRequestsPermissionAndStartsCapture() async {
+    let service = MockVoiceCaptureService(
+      permissionState: .unknown,
+      initialState: .permissionNeeded,
+      permissionRequestResult: .granted
+    )
+    let viewModel = VoiceCaptureViewModel(
+      service: service,
+      transcriptionClient: MockBackendTranscriptionClient(delayNanoseconds: 0),
+      backendConfiguration: BackendConfiguration(
+        baseURL: URL(string: "http://jarvis.local")!,
+        bearerToken: "test-token",
+        deviceName: "CI iPhone"
+      )
+    )
+
+    await viewModel.prepare()
+    await viewModel.handlePrimaryActionAsync()
+
+    XCTAssertEqual(viewModel.permissionState, .granted)
+    XCTAssertEqual(viewModel.captureState, .recording)
+  }
+
+  func testStoppingCaptureUploadsClipAndRendersTranscript() async {
+    let service = MockVoiceCaptureService(permissionState: .granted, initialState: .ready)
+    let transcriptionClient = MockBackendTranscriptionClient(delayNanoseconds: 0)
+    let viewModel = VoiceCaptureViewModel(
+      service: service,
+      transcriptionClient: transcriptionClient,
+      backendConfiguration: BackendConfiguration(
+        baseURL: URL(string: "http://jarvis.local")!,
+        bearerToken: "test-token",
+        deviceName: "CI iPhone"
+      )
+    )
+
+    await viewModel.prepare()
+    await viewModel.handlePrimaryActionAsync()
+    XCTAssertEqual(viewModel.captureState, .recording)
+
+    await viewModel.handlePrimaryActionAsync()
+    XCTAssertEqual(viewModel.captureState, .ready)
+    XCTAssertEqual(viewModel.audioLevel, .silent)
+    XCTAssertEqual(
+      viewModel.transcriptionState,
+      .succeeded(
+        BackendTranscriptionResult(
+          requestID: transcriptionClient.requestIDs[0],
+          transcriptText: "Turn on the kitchen lights",
+          normalizedText: "turn on the kitchen lights",
+          language: "en",
+          durationMS: 1000,
+          provider: "mock-backend",
+          confidence: nil
         )
-        let viewModel = VoiceCaptureViewModel(service: service)
+      )
+    )
+    XCTAssertEqual(viewModel.transcriptText, "Turn on the kitchen lights")
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: transcriptionClient.uploadedClipURLs[0].path
+      )
+    )
+  }
 
-        await viewModel.prepare()
-        await viewModel.handlePrimaryActionAsync()
+  func testPrimaryActionSurfacesServiceError() async {
+    let service = MockVoiceCaptureService(
+      permissionState: .granted,
+      initialState: .ready,
+      startError: "Input node failed to initialize."
+    )
+    let viewModel = VoiceCaptureViewModel(
+      service: service,
+      transcriptionClient: MockBackendTranscriptionClient(delayNanoseconds: 0),
+      backendConfiguration: BackendConfiguration(
+        baseURL: URL(string: "http://jarvis.local")!,
+        bearerToken: "test-token",
+        deviceName: "CI iPhone"
+      )
+    )
 
-        XCTAssertEqual(viewModel.permissionState, .granted)
-        XCTAssertEqual(viewModel.captureState, .recording)
-    }
+    await viewModel.prepare()
+    await viewModel.handlePrimaryActionAsync()
 
-    func testStoppingCaptureReturnsViewModelToReadyState() async {
-        let service = MockVoiceCaptureService(permissionState: .granted, initialState: .ready)
-        let viewModel = VoiceCaptureViewModel(service: service)
+    XCTAssertEqual(viewModel.captureState, .error("Input node failed to initialize."))
+    XCTAssertEqual(viewModel.headline, "Capture Fault Detected")
+  }
 
-        await viewModel.prepare()
-        await viewModel.handlePrimaryActionAsync()
-        XCTAssertEqual(viewModel.captureState, .recording)
+  func testStopCaptureWithoutBackendConfigurationShowsDeterministicErrorAndDeletesClip() async {
+    let service = MockVoiceCaptureService(permissionState: .granted, initialState: .ready)
+    let transcriptionClient = MockBackendTranscriptionClient(delayNanoseconds: 0)
+    let viewModel = VoiceCaptureViewModel(
+      service: service,
+      transcriptionClient: transcriptionClient,
+      backendConfiguration: nil
+    )
 
-        await viewModel.handlePrimaryActionAsync()
-        XCTAssertEqual(viewModel.captureState, .ready)
-        XCTAssertEqual(viewModel.audioLevel, .silent)
-    }
+    await viewModel.prepare()
+    await viewModel.handlePrimaryActionAsync()
+    await viewModel.handlePrimaryActionAsync()
 
-    func testPrimaryActionSurfacesServiceError() async {
-        let service = MockVoiceCaptureService(
-            permissionState: .granted,
-            initialState: .ready,
-            startError: "Input node failed to initialize."
-        )
-        let viewModel = VoiceCaptureViewModel(service: service)
-
-        await viewModel.prepare()
-        await viewModel.handlePrimaryActionAsync()
-
-        XCTAssertEqual(viewModel.captureState, .error("Input node failed to initialize."))
-        XCTAssertEqual(viewModel.headline, "Capture Fault Detected")
-    }
+    XCTAssertEqual(
+      viewModel.transcriptionState,
+      .failed(
+        """
+        Backend link is not configured. Add JARVIS_CORE_API_BASE_URL and \
+        JARVIS_API_BEARER_TOKEN to the app launch environment.
+        """
+      )
+    )
+    XCTAssertTrue(transcriptionClient.requestIDs.isEmpty)
+  }
 }

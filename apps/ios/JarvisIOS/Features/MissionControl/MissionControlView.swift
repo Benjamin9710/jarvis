@@ -1,174 +1,189 @@
 import SwiftUI
 
 struct MissionControlView: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @StateObject private var viewModel: VoiceCaptureViewModel
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @StateObject private var viewModel: VoiceCaptureViewModel
 
-    init(viewModel: VoiceCaptureViewModel) {
-        _viewModel = StateObject(wrappedValue: viewModel)
+  init(viewModel: VoiceCaptureViewModel) {
+    _viewModel = StateObject(wrappedValue: viewModel)
+  }
+
+  var body: some View {
+    ZStack {
+      JarvisBackground()
+
+      ScrollView(showsIndicators: false) {
+        VStack(spacing: 18) {
+          headerPanel
+          capturePanel
+          transcriptPanel
+          telemetryPanel
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 24)
+      }
+    }
+    .preferredColorScheme(.dark)
+    .task {
+      await viewModel.prepare()
+    }
+  }
+
+  private var headerPanel: some View {
+    HUDPanel(title: "Identity") {
+      VStack(alignment: .leading, spacing: 14) {
+        HStack(alignment: .firstTextBaseline) {
+          VStack(alignment: .leading, spacing: 6) {
+            Text("JARVIS")
+              .font(.system(size: 34, weight: .black, design: .rounded))
+              .foregroundStyle(JarvisTheme.textPrimary)
+              .kerning(1.6)
+
+            Text("Mission Control Interface")
+              .font(.system(.subheadline, design: .monospaced).weight(.medium))
+              .foregroundStyle(JarvisTheme.textSecondary)
+          }
+
+          Spacer(minLength: 16)
+
+          StatusChip(title: viewModel.statusBannerText, tone: statusTone)
+        }
+
+        Text(
+          "Current frontend milestone: finalized clip capture, backend upload, "
+            + "offline transcription, and local mission-control rendering."
+        )
+        .font(.system(.body, design: .rounded))
+        .foregroundStyle(JarvisTheme.textSecondary)
+        .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+  }
+
+  private var capturePanel: some View {
+    HUDPanel(title: "Voice Capture") {
+      VStack(spacing: 18) {
+        JarvisOrb(
+          audioLevel: viewModel.audioLevel.normalized,
+          isRecording: viewModel.captureState == .recording,
+          reduceMotion: reduceMotion
+        )
+
+        VStack(spacing: 8) {
+          Text(viewModel.headline)
+            .font(.system(size: 28, weight: .bold, design: .rounded))
+            .multilineTextAlignment(.center)
+            .foregroundStyle(JarvisTheme.textPrimary)
+            .accessibilityIdentifier("mission-headline")
+
+          Text(viewModel.detailText)
+            .font(.system(.body, design: .rounded))
+            .multilineTextAlignment(.center)
+            .foregroundStyle(JarvisTheme.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+
+        Button(action: viewModel.handlePrimaryAction) {
+          VStack(spacing: 4) {
+            Text(viewModel.primaryButtonTitle)
+              .font(.system(.headline, design: .rounded).weight(.bold))
+            Text(viewModel.primaryButtonSubtitle)
+              .font(.system(.caption, design: .monospaced).weight(.semibold))
+              .kerning(1.2)
+              .foregroundStyle(JarvisTheme.textSecondary)
+          }
+          .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(JarvisPrimaryButtonStyle(tone: tone(for: viewModel.captureState)))
+        .disabled(viewModel.isPrimaryButtonDisabled)
+        .accessibilityIdentifier("primary-capture-button")
+      }
+    }
+  }
+
+  private var transcriptPanel: some View {
+    HUDPanel(title: viewModel.transcriptPanelTitle) {
+      Text(viewModel.transcriptText)
+        .font(.system(.body, design: .rounded))
+        .foregroundStyle(JarvisTheme.textPrimary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+
+  private var telemetryPanel: some View {
+    HUDPanel(title: "System Telemetry") {
+      VStack(spacing: 12) {
+        HStack(spacing: 12) {
+          MetricCard(label: "Capture Mode", value: viewModel.captureModeLabel)
+          MetricCard(label: "Input Level", value: viewModel.inputLevelLabel)
+        }
+
+        HStack(spacing: 12) {
+          MetricCard(label: "Microphone", value: viewModel.permissionLabel)
+          MetricCard(label: "Voice Link", value: viewModel.networkLabel)
+        }
+      }
+    }
+  }
+
+  private func tone(for state: VoiceCaptureState) -> Color {
+    switch state {
+    case .recording:
+      return JarvisTheme.accentStrong
+    case .permissionNeeded:
+      return JarvisTheme.warning
+    case .error:
+      return JarvisTheme.error
+    case .stopping:
+      return JarvisTheme.warning
+    case .idle, .ready:
+      return JarvisTheme.accent
+    }
+  }
+
+  private var statusTone: Color {
+    if viewModel.transcriptionState.isInFlight {
+      return JarvisTheme.warning
     }
 
-    var body: some View {
-        ZStack {
-            JarvisBackground()
-
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 18) {
-                    headerPanel
-                    capturePanel
-                    transcriptPanel
-                    telemetryPanel
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 24)
-            }
-        }
-        .preferredColorScheme(.dark)
-        .task {
-            await viewModel.prepare()
-        }
+    if case .failed = viewModel.transcriptionState {
+      return JarvisTheme.error
     }
 
-    private var headerPanel: some View {
-        HUDPanel(title: "Identity") {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("JARVIS")
-                            .font(.system(size: 34, weight: .black, design: .rounded))
-                            .foregroundStyle(JarvisTheme.textPrimary)
-                            .kerning(1.6)
-
-                        Text("Mission Control Interface")
-                            .font(.system(.subheadline, design: .monospaced).weight(.medium))
-                            .foregroundStyle(JarvisTheme.textSecondary)
-                    }
-
-                    Spacer(minLength: 16)
-
-                    StatusChip(title: viewModel.statusBannerText, tone: tone(for: viewModel.captureState))
-                }
-
-                Text("First frontend milestone: polished push-to-talk capture, simulator-safe state fixtures, and local-only audio metering.")
-                    .font(.system(.body, design: .rounded))
-                    .foregroundStyle(JarvisTheme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private var capturePanel: some View {
-        HUDPanel(title: "Voice Capture") {
-            VStack(spacing: 18) {
-                JarvisOrb(
-                    audioLevel: viewModel.audioLevel.normalized,
-                    isRecording: viewModel.captureState == .recording,
-                    reduceMotion: reduceMotion
-                )
-
-                VStack(spacing: 8) {
-                    Text(viewModel.headline)
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(JarvisTheme.textPrimary)
-                        .accessibilityIdentifier("mission-headline")
-
-                    Text(viewModel.detailText)
-                        .font(.system(.body, design: .rounded))
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(JarvisTheme.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Button(action: viewModel.handlePrimaryAction) {
-                    VStack(spacing: 4) {
-                        Text(viewModel.primaryButtonTitle)
-                            .font(.system(.headline, design: .rounded).weight(.bold))
-                        Text(viewModel.primaryButtonSubtitle)
-                            .font(.system(.caption, design: .monospaced).weight(.semibold))
-                            .kerning(1.2)
-                            .foregroundStyle(JarvisTheme.textSecondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(JarvisPrimaryButtonStyle(tone: tone(for: viewModel.captureState)))
-                .disabled(viewModel.isPrimaryButtonDisabled)
-                .accessibilityIdentifier("primary-capture-button")
-            }
-        }
-    }
-
-    private var transcriptPanel: some View {
-        HUDPanel(title: viewModel.transcriptPanelTitle) {
-            Text(viewModel.transcriptPlaceholder)
-                .font(.system(.body, design: .rounded))
-                .foregroundStyle(JarvisTheme.textPrimary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private var telemetryPanel: some View {
-        HUDPanel(title: "System Telemetry") {
-            VStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    MetricCard(label: "Capture Mode", value: viewModel.captureModeLabel)
-                    MetricCard(label: "Input Level", value: viewModel.inputLevelLabel)
-                }
-
-                HStack(spacing: 12) {
-                    MetricCard(label: "Microphone", value: viewModel.permissionLabel)
-                    MetricCard(label: "Voice Link", value: viewModel.networkLabel)
-                }
-            }
-        }
-    }
-
-    private func tone(for state: VoiceCaptureState) -> Color {
-        switch state {
-        case .recording:
-            return JarvisTheme.accentStrong
-        case .permissionNeeded:
-            return JarvisTheme.warning
-        case .error(_):
-            return JarvisTheme.error
-        case .stopping:
-            return JarvisTheme.warning
-        case .idle, .ready:
-            return JarvisTheme.accent
-        }
-    }
+    return tone(for: viewModel.captureState)
+  }
 }
 
 private struct JarvisPrimaryButtonStyle: ButtonStyle {
-    let tone: Color
+  let tone: Color
 
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .padding(.horizontal, 18)
-            .padding(.vertical, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(tone.opacity(configuration.isPressed ? 0.18 : 0.12))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .stroke(tone.opacity(configuration.isPressed ? 0.95 : 0.6), lineWidth: 1.2)
-                    )
-            )
-            .foregroundStyle(JarvisTheme.textPrimary)
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
-            .shadow(color: tone.opacity(0.22), radius: 10, y: 4)
-            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
-    }
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .padding(.horizontal, 18)
+      .padding(.vertical, 16)
+      .background(
+        RoundedRectangle(cornerRadius: 22, style: .continuous)
+          .fill(tone.opacity(configuration.isPressed ? 0.18 : 0.12))
+          .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+              .stroke(tone.opacity(configuration.isPressed ? 0.95 : 0.6), lineWidth: 1.2)
+          )
+      )
+      .foregroundStyle(JarvisTheme.textPrimary)
+      .scaleEffect(configuration.isPressed ? 0.985 : 1)
+      .shadow(color: tone.opacity(0.22), radius: 10, y: 4)
+      .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
+  }
 }
 
 #Preview("Ready") {
-    MissionControlView(viewModel: AppEnvironment.makePreviewViewModel(scenario: .ready))
+  MissionControlView(viewModel: AppEnvironment.makePreviewViewModel(scenario: .ready))
 }
 
 #Preview("Recording") {
-    MissionControlView(viewModel: AppEnvironment.makePreviewViewModel(scenario: .recording))
+  MissionControlView(viewModel: AppEnvironment.makePreviewViewModel(scenario: .recording))
 }
 
 #Preview("Permission Needed") {
-    MissionControlView(viewModel: AppEnvironment.makePreviewViewModel(scenario: .permissionNeeded))
+  MissionControlView(viewModel: AppEnvironment.makePreviewViewModel(scenario: .permissionNeeded))
 }

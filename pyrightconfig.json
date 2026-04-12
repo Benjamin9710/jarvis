@@ -1,0 +1,28 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "error",
+  "include": [
+    "services/core-api/app",
+    "services/core-api/tests",
+    "services/voice/src",
+    "services/voice/tests"
+  ],
+  "executionEnvironments": [
+    {
+      "root": "services/core-api",
+      "extraPaths": [
+        "services/core-api",
+        "services/voice/src"
+      ]
+    },
+    {
+      "root": "services/voice",
+      "extraPaths": [
+        "services/voice/src"
+      ]
+    }
+  ]
+}

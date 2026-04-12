@@ -25,13 +25,15 @@ Device argument is optional. If omitted, scripts auto-pick the first available i
 ## Implementation Rules
 - Keep capture logic mockable through `VoiceCaptureServiceProtocol`.
 - Keep UI deterministic for tests via launch args and `JARVIS_CAPTURE_SCENARIO`.
-- Do not introduce backend upload/transcription behavior in this boundary yet.
+- Keep backend upload/transcription behavior behind a separate client from the microphone capture service.
+- Source backend URL/token/device diagnostics centrally from `AppEnvironment`.
 - Preserve Jarvis-style mission-control visual language unless explicitly redesigning.
 - For any changed `.swift` files, run `swift-format` before running tests or handing off changes.
 - Keep `swiftlint lint --strict` passing for this boundary.
 
 ## Testing Rules
 - For capture behavior changes: update unit tests and UI tests.
+- For backend transcription UI changes: cover success and failure using mock backend scenarios.
 - For visual/state interaction changes: run `test-ui-interactions.sh`.
 - For service/view-model changes: run `test-simulator.sh`.
 - When Xcode/simulator is unavailable, explicitly state the limitation.

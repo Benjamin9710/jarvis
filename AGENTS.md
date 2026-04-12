@@ -34,6 +34,10 @@ Current runnable workflows exist in `apps/ios`:
 - `bash apps/ios/scripts/test-simulator.sh`
 - `bash apps/ios/scripts/test-ui-interactions.sh`
 
+Python quality workflow:
+
+- `bash services/core-api/scripts/check-python.sh`
+
 ## Coding Style & Naming Conventions
 Follow planned stack and boundary naming:
 
@@ -42,6 +46,12 @@ Follow planned stack and boundary naming:
 - Markdown docs with concise operational prose.
 - Boundary-driven names such as `core-api`, `device-gateway`, `DeviceCommand`.
 - Provider-specific logic under `services/device-gateway/src/providers/<provider>/`.
+
+## DRY Rules
+- Treat duplicated business logic, contract shaping, and validation rules as defects; extract a shared helper/module instead of copying behavior.
+- When the same logic appears in a second place, stop and consolidate it in the nearest shared boundary before adding a third copy.
+- Prefer one authoritative implementation for each contract or invariant, and have callers depend on that implementation rather than rebuilding payloads ad hoc.
+- When introducing a shared helper, add or update tests that exercise the shared path so future changes cannot silently diverge.
 
 ## Testing Guidelines
 Add tests with every implementation change:
@@ -53,6 +63,33 @@ Add tests with every implementation change:
   - run full suite for behavior changes
   - run UI-only suite for interaction checks
 - Keep microphone and capture flows mockable so tests do not require real hardware.
+
+## Quality Gates For New Stacks
+When introducing a new language, framework, or runtime, do not ship code until quality gates are defined and runnable locally.
+
+Required setup in the same change that introduces the new stack:
+
+- Add formatting/linting/static analysis tools appropriate to that stack.
+- Add automated tests (at least unit tests; include integration tests when boundary behavior is involved).
+- Add deterministic commands/scripts to run checks locally.
+- Document commands and expectations in the nearest boundary `AGENTS.md`.
+- Update root `AGENTS.md` if new cross-repo commands or standards are added.
+
+Required execution before handoff:
+
+- Run lint/format/type-check/test commands relevant to changed files.
+- Run real integration coverage for any changed app/API boundary, not just mocks or in-process unit paths.
+- For backend HTTP changes, run at least one live request path against the service entrypoint that the real client will use.
+- For adapter/provider changes, run at least one non-fake integration path against the actual runtime binary or SDK before handoff.
+- If a required tool cannot run in the environment, state exactly what was not run and why.
+- Do not assume correctness from compilation or code inspection alone.
+
+Minimum bar by category:
+
+- Compiled or interpreted app code: formatter/linter + tests.
+- API/service code: linter/type-check + unit tests + at least one boundary/integration path.
+- Containerized API/service code: the above plus at least one dockerized smoke/integration run when Docker is part of the supported runtime.
+- Shared contracts/schemas: schema validation or contract-focused tests/examples plus consumer impact notes.
 
 ## Commit & Pull Request Guidelines
 Use focused commits with imperative subjects, for example:
