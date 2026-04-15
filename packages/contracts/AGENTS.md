@@ -6,6 +6,7 @@
 ## Current Artifacts
 - `command-intent.md`
 - `device-command.md`
+- `voice-interaction.md`
 - `voice-transcription.md`
 
 ## Editing Guidance

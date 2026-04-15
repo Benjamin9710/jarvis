@@ -19,3 +19,9 @@ class UnsupportedAudioFormatError(TranscriptionError):
 class AdapterExecutionError(TranscriptionError):
     def __init__(self, message: str = "Audio could not be transcribed.") -> None:
         super().__init__("transcription_failed", message, status_code=500)
+
+
+class TextToSpeechError(Exception):
+    def __init__(self, message: str = "Audio response could not be synthesized.") -> None:
+        super().__init__(message)
+        self.message = message

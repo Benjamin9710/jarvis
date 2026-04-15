@@ -6,30 +6,44 @@ struct BackendConfiguration: Equatable {
   let deviceName: String
 }
 
-struct BackendTranscriptionResult: Decodable, Equatable {
+struct BackendVoiceInteractionResult: Decodable, Equatable {
   let requestID: String
   let transcriptText: String
   let normalizedText: String
-  let language: String
-  let durationMS: Int
-  let provider: String
-  let confidence: Double?
+  let commandStatus: String
+  let commandAction: String?
+  let commandTarget: String?
+  let summaryText: String
+  let spokenText: String
+  let responseAudioBase64: String?
+  let responseAudioContentType: String?
+  let responseAudioSampleRateHZ: Int?
+  let sttProvider: String
+  let ttsProvider: String
+  let ttsStatus: String
 
   enum CodingKeys: String, CodingKey {
     case requestID = "request_id"
     case transcriptText = "transcript_text"
     case normalizedText = "normalized_text"
-    case language
-    case durationMS = "duration_ms"
-    case provider
-    case confidence
+    case commandStatus = "command_status"
+    case commandAction = "command_action"
+    case commandTarget = "command_target"
+    case summaryText = "summary_text"
+    case spokenText = "spoken_text"
+    case responseAudioBase64 = "response_audio_base64"
+    case responseAudioContentType = "response_audio_content_type"
+    case responseAudioSampleRateHZ = "response_audio_sample_rate_hz"
+    case sttProvider = "stt_provider"
+    case ttsProvider = "tts_provider"
+    case ttsStatus = "tts_status"
   }
 }
 
-enum VoiceTranscriptionState: Equatable {
+enum VoiceInteractionState: Equatable {
   case idle
   case inFlight
-  case succeeded(BackendTranscriptionResult)
+  case succeeded(BackendVoiceInteractionResult)
   case failed(String)
 
   var isInFlight: Bool {
@@ -41,7 +55,7 @@ enum VoiceTranscriptionState: Equatable {
   }
 }
 
-enum BackendTranscriptionClientError: LocalizedError {
+enum BackendVoiceInteractionClientError: LocalizedError {
   case missingClip
   case invalidServerResponse
   case server(String, statusCode: Int? = nil)
@@ -66,45 +80,54 @@ private struct BackendErrorResponse: Decodable {
 }
 
 @MainActor
-protocol BackendTranscriptionClientProtocol: AnyObject {
-  func transcribe(
+protocol BackendVoiceInteractionClientProtocol: AnyObject {
+  func interact(
     clip: RecordedAudioClip,
     configuration: BackendConfiguration,
     clientRequestID: String
-  ) async throws -> BackendTranscriptionResult
+  ) async throws -> BackendVoiceInteractionResult
 }
 
 @MainActor
-final class BackendTranscriptionClient: BackendTranscriptionClientProtocol {
+final class BackendTranscriptionClient: BackendVoiceInteractionClientProtocol {
   private let session: URLSession
-  private let encoder = JSONDecoder()
+  private let decoder = JSONDecoder()
+  private static let interactionTimeoutSeconds: TimeInterval = 300
 
-  init(session: URLSession = .shared) {
-    self.session = session
+  init(session: URLSession? = nil) {
+    if let session {
+      self.session = session
+    } else {
+      let configuration = URLSessionConfiguration.default
+      configuration.timeoutIntervalForRequest = Self.interactionTimeoutSeconds
+      configuration.timeoutIntervalForResource = Self.interactionTimeoutSeconds
+      self.session = URLSession(configuration: configuration)
+    }
   }
 
   // swiftlint:disable function_body_length
-  func transcribe(
+  func interact(
     clip: RecordedAudioClip,
     configuration: BackendConfiguration,
     clientRequestID: String
-  ) async throws -> BackendTranscriptionResult {
+  ) async throws -> BackendVoiceInteractionResult {
     guard FileManager.default.fileExists(atPath: clip.fileURL.path) else {
-      throw BackendTranscriptionClientError.missingClip
+      throw BackendVoiceInteractionClientError.missingClip
     }
 
     let audioData: Data
     do {
       audioData = try Data(contentsOf: clip.fileURL)
     } catch {
-      throw BackendTranscriptionClientError.transport(
+      throw BackendVoiceInteractionClientError.transport(
         "Jarvis could not read the captured audio clip."
       )
     }
 
-    var request = URLRequest(url: configuration.baseURL.appending(path: "v1/voice/transcriptions"))
+    var request = URLRequest(url: configuration.baseURL.appending(path: "v1/voice/interactions"))
     let boundary = "JarvisBoundary-\(UUID().uuidString)"
     request.httpMethod = "POST"
+    request.timeoutInterval = Self.interactionTimeoutSeconds
     request.setValue("Bearer \(configuration.bearerToken)", forHTTPHeaderField: "Authorization")
     request.setValue(
       "multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -122,33 +145,33 @@ final class BackendTranscriptionClient: BackendTranscriptionClientProtocol {
       (responseData, response) = try await session.data(for: request)
     } catch {
       let nsError = error as NSError
-      throw BackendTranscriptionClientError.transport(
-        "Jarvis could not reach the backend transcription service.",
+      throw BackendVoiceInteractionClientError.transport(
+        "Jarvis could not reach the backend interaction service.",
         code: nsError.code,
         domain: nsError.domain
       )
     }
 
     guard let httpResponse = response as? HTTPURLResponse else {
-      throw BackendTranscriptionClientError.invalidServerResponse
+      throw BackendVoiceInteractionClientError.invalidServerResponse
     }
 
     if (200..<300).contains(httpResponse.statusCode) {
       do {
-        return try encoder.decode(BackendTranscriptionResult.self, from: responseData)
+        return try decoder.decode(BackendVoiceInteractionResult.self, from: responseData)
       } catch {
-        throw BackendTranscriptionClientError.invalidServerResponse
+        throw BackendVoiceInteractionClientError.invalidServerResponse
       }
     }
 
-    if let serverError = try? encoder.decode(BackendErrorResponse.self, from: responseData) {
-      throw BackendTranscriptionClientError.server(
+    if let serverError = try? decoder.decode(BackendErrorResponse.self, from: responseData) {
+      throw BackendVoiceInteractionClientError.server(
         serverError.message,
         statusCode: httpResponse.statusCode
       )
     }
 
-    throw BackendTranscriptionClientError.server(
+    throw BackendVoiceInteractionClientError.server(
       "Jarvis received an unexpected backend response.",
       statusCode: httpResponse.statusCode
     )
@@ -190,15 +213,17 @@ final class BackendTranscriptionClient: BackendTranscriptionClientProtocol {
   }
 }
 
-enum AppTranscriptionScenario: String {
+enum AppInteractionScenario: String {
   case success
+  case unsupported
+  case missingAudio = "missing-audio"
   case failure
   case misconfigured
 }
 
 @MainActor
-final class MockBackendTranscriptionClient: BackendTranscriptionClientProtocol {
-  private let result: BackendTranscriptionResult
+final class MockBackendTranscriptionClient: BackendVoiceInteractionClientProtocol {
+  private let result: BackendVoiceInteractionResult
   private let errorMessage: String?
   private let delayNanoseconds: UInt64
 
@@ -206,14 +231,21 @@ final class MockBackendTranscriptionClient: BackendTranscriptionClientProtocol {
   private(set) var uploadedClipURLs: [URL] = []
 
   init(
-    result: BackendTranscriptionResult = BackendTranscriptionResult(
+    result: BackendVoiceInteractionResult = BackendVoiceInteractionResult(
       requestID: "mock-request",
       transcriptText: "Turn on the kitchen lights",
       normalizedText: "turn on the kitchen lights",
-      language: "en",
-      durationMS: 1000,
-      provider: "mock-backend",
-      confidence: nil
+      commandStatus: "succeeded",
+      commandAction: "turn_on",
+      commandTarget: "kitchen",
+      summaryText: "Kitchen lights turned on",
+      spokenText: "Certainly. The kitchen lights are now on.",
+      responseAudioBase64: Data("mock-audio".utf8).base64EncodedString(),
+      responseAudioContentType: "audio/wav",
+      responseAudioSampleRateHZ: 24_000,
+      sttProvider: "mock-backend",
+      ttsProvider: "mock-tts",
+      ttsStatus: "succeeded"
     ),
     errorMessage: String? = nil,
     delayNanoseconds: UInt64 = 100_000_000
@@ -223,22 +255,60 @@ final class MockBackendTranscriptionClient: BackendTranscriptionClientProtocol {
     self.delayNanoseconds = delayNanoseconds
   }
 
-  convenience init(scenario: AppTranscriptionScenario) {
+  convenience init(scenario: AppInteractionScenario) {
     switch scenario {
     case .success:
       self.init()
+    case .unsupported:
+      self.init(
+        result: BackendVoiceInteractionResult(
+          requestID: "mock-request",
+          transcriptText: "Open the garage door",
+          normalizedText: "open the garage door",
+          commandStatus: "unsupported",
+          commandAction: nil,
+          commandTarget: nil,
+          summaryText: "Command not available",
+          spokenText: "I'm afraid I can't do that just yet.",
+          responseAudioBase64: Data("mock-audio".utf8).base64EncodedString(),
+          responseAudioContentType: "audio/wav",
+          responseAudioSampleRateHZ: 24_000,
+          sttProvider: "mock-backend",
+          ttsProvider: "mock-tts",
+          ttsStatus: "succeeded"
+        )
+      )
+    case .missingAudio:
+      self.init(
+        result: BackendVoiceInteractionResult(
+          requestID: "mock-request",
+          transcriptText: "Turn on the kitchen lights",
+          normalizedText: "turn on the kitchen lights",
+          commandStatus: "succeeded",
+          commandAction: "turn_on",
+          commandTarget: "kitchen",
+          summaryText: "Kitchen lights turned on",
+          spokenText: "Certainly. The kitchen lights are now on.",
+          responseAudioBase64: nil,
+          responseAudioContentType: nil,
+          responseAudioSampleRateHZ: nil,
+          sttProvider: "mock-backend",
+          ttsProvider: "mock-tts",
+          ttsStatus: "failed"
+        )
+      )
     case .failure:
-      self.init(errorMessage: "Jarvis could not transcribe the latest upload.")
+      self.init(errorMessage: "Jarvis could not process the latest voice interaction.")
     case .misconfigured:
       self.init()
     }
   }
 
-  func transcribe(
+  func interact(
     clip: RecordedAudioClip,
     configuration: BackendConfiguration,
     clientRequestID: String
-  ) async throws -> BackendTranscriptionResult {
+  ) async throws -> BackendVoiceInteractionResult {
     requestIDs.append(clientRequestID)
     uploadedClipURLs.append(clip.fileURL)
     _ = configuration
@@ -248,17 +318,24 @@ final class MockBackendTranscriptionClient: BackendTranscriptionClientProtocol {
     }
 
     if let errorMessage {
-      throw BackendTranscriptionClientError.server(errorMessage)
+      throw BackendVoiceInteractionClientError.server(errorMessage)
     }
 
-    return BackendTranscriptionResult(
+    return BackendVoiceInteractionResult(
       requestID: clientRequestID,
       transcriptText: result.transcriptText,
       normalizedText: result.normalizedText,
-      language: result.language,
-      durationMS: result.durationMS,
-      provider: result.provider,
-      confidence: result.confidence
+      commandStatus: result.commandStatus,
+      commandAction: result.commandAction,
+      commandTarget: result.commandTarget,
+      summaryText: result.summaryText,
+      spokenText: result.spokenText,
+      responseAudioBase64: result.responseAudioBase64,
+      responseAudioContentType: result.responseAudioContentType,
+      responseAudioSampleRateHZ: result.responseAudioSampleRateHZ,
+      sttProvider: result.sttProvider,
+      ttsProvider: result.ttsProvider,
+      ttsStatus: result.ttsStatus
     )
   }
 }

@@ -8,7 +8,7 @@ VENV_PYRIGHT="$ROOT_DIR/.venv/bin/pyright"
 if [[ ! -x "$VENV_PYTHON" ]]; then
   echo "Missing virtualenv at $ROOT_DIR/.venv"
   echo "Run: python3 -m venv .venv"
-  echo "Then: .venv/bin/python -m pip install -e services/voice -e services/core-api pyright pytest"
+  echo "Then: .venv/bin/python -m pip install -e 'services/voice[xtts]' -e services/core-api pyright pytest"
   exit 1
 fi
 

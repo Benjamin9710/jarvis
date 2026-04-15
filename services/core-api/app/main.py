@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 import time
 
 from .config import Settings
-from .dependencies import build_transcription_service
+from .dependencies import build_interaction_service, build_text_to_speech_service, build_transcription_service
 from .errors import ApiError, build_error_response
 from .routes.health import router as health_router
 from .routes.voice import router as voice_router
@@ -26,6 +26,12 @@ def create_app(
     app = FastAPI(title="Jarvis Core API")
     app.state.settings = resolved_settings
     app.state.transcription_service = build_transcription_service(resolved_settings)
+    app.state.tts_service = build_text_to_speech_service(resolved_settings)
+    app.state.interaction_service = build_interaction_service(
+        resolved_settings,
+        app.state.transcription_service,
+        app.state.tts_service,
+    )
     app.state.trace_logger = LocalTraceLogger(directory=resolved_settings.backend_log_dir)
     configure_trace_logger(app.state.trace_logger)
 

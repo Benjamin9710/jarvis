@@ -4,7 +4,7 @@
 `services/voice` will own speech pipeline processing and audio session workflows.
 
 ## Current State
-This boundary now contains the first speech-to-text models, normalization logic, and adapter scaffolding.
+This boundary now contains the first speech-to-text models, normalization logic, Jarvis response composition, and TTS adapter scaffolding.
 
 ## Planned Responsibilities
 - voice session lifecycle
@@ -20,3 +20,5 @@ This boundary now contains the first speech-to-text models, normalization logic,
 - Keep offline-first STT behavior portable across Apple Silicon and Linux.
 - Run static checks with `../../.venv/bin/pyright` from repo root after Python changes.
 - When changing a real STT adapter, run at least one non-fake transcription path against the actual runtime before handoff.
+- Keep TTS adapter imports lazy so tests can run without the heavyweight XTTS runtime installed.
+- For XTTS, prefer built-in preset speakers first and treat speaker-cloning inputs as optional follow-on configuration.

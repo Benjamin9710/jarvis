@@ -25,3 +25,19 @@ class CompletedTranscription:
     duration_ms: int
     provider: str
     confidence: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TextToSpeechRequest:
+    text: str
+    language: str = "en"
+    speaker: str | None = None
+    speaker_wav: Path | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SynthesizedSpeech:
+    audio_bytes: bytes
+    provider: str
+    content_type: str = "audio/wav"
+    sample_rate_hz: int | None = None

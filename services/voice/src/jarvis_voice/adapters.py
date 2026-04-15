@@ -1,16 +1,27 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import subprocess
 from typing import Protocol
 
-from .exceptions import AdapterExecutionError
-from .models import TranscriptionRequest, TranscriptionResult
+from .exceptions import AdapterExecutionError, TextToSpeechError
+from .models import (
+    SynthesizedSpeech,
+    TextToSpeechRequest,
+    TranscriptionRequest,
+    TranscriptionResult,
+)
+from .tts import XttsModelRuntime, build_silent_wav
 
 
 class SpeechToTextAdapter(Protocol):
     def transcribe(self, request: TranscriptionRequest) -> TranscriptionResult:
+        ...
+
+
+class TextToSpeechAdapter(Protocol):
+    def synthesize(self, request: TextToSpeechRequest) -> SynthesizedSpeech:
         ...
 
 
@@ -85,3 +96,50 @@ class WhisperCppSpeechToTextAdapter:
             provider="whisper.cpp",
             confidence=None,
         )
+
+
+@dataclass(frozen=True, slots=True)
+class FakeTextToSpeechAdapter:
+    provider: str = "fake-tts"
+    sample_rate_hz: int = 24_000
+
+    def synthesize(self, request: TextToSpeechRequest) -> SynthesizedSpeech:
+        _ = request
+        return SynthesizedSpeech(
+            audio_bytes=build_silent_wav(sample_rate_hz=self.sample_rate_hz),
+            provider=self.provider,
+            content_type="audio/wav",
+            sample_rate_hz=self.sample_rate_hz,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class XttsTextToSpeechAdapter:
+    model_name: str
+    speaker: str
+    device: str = "auto"
+    cache_dir: Path = Path("/tmp/jarvis-xtts-cache")
+    _runtime: XttsModelRuntime = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "_runtime",
+            XttsModelRuntime(
+                model_name=self.model_name,
+                device=self.device,
+                cache_dir=self.cache_dir,
+            ),
+        )
+
+    def synthesize(self, request: TextToSpeechRequest) -> SynthesizedSpeech:
+        resolved_request = TextToSpeechRequest(
+            text=request.text,
+            language=request.language,
+            speaker=request.speaker or self.speaker,
+            speaker_wav=request.speaker_wav,
+        )
+        try:
+            return self._runtime.synthesize(resolved_request)
+        except TextToSpeechError:
+            raise

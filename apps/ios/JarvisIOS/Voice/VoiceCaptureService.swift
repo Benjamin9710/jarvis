@@ -1,5 +1,7 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import Foundation
+
+// swiftlint:disable file_length type_body_length
 
 enum VoiceCaptureServiceError: LocalizedError {
   case permissionDenied
@@ -18,7 +20,20 @@ enum VoiceCaptureServiceError: LocalizedError {
   }
 }
 
-// swiftlint:disable type_body_length
+enum VoiceResponsePlaybackServiceError: LocalizedError {
+  case unsupportedAudioFormat
+  case playbackFailed(String)
+
+  var errorDescription: String? {
+    switch self {
+    case .unsupportedAudioFormat:
+      return "Jarvis returned an unsupported response audio format."
+    case .playbackFailed(let message):
+      return message
+    }
+  }
+}
+
 @MainActor
 final class VoiceCaptureService: VoiceCaptureServiceProtocol {
   var eventHandler: ((VoiceCaptureEvent) -> Void)?
@@ -163,8 +178,6 @@ final class VoiceCaptureService: VoiceCaptureServiceProtocol {
   }
 
   private func prepareRecordingFile() throws {
-    let inputNode = engine.inputNode
-    let inputFormat = inputNode.outputFormat(forBus: 0)
     guard
       let outputFormat = AVAudioFormat(
         commonFormat: .pcmFormatInt16,
@@ -335,4 +348,93 @@ final class VoiceCaptureService: VoiceCaptureServiceProtocol {
     }
   }
 }
-// swiftlint:enable type_body_length
+@MainActor
+// swiftlint:disable opening_brace
+final class VoiceResponsePlaybackService: NSObject, AVAudioPlayerDelegate,
+  VoiceResponsePlaybackServiceProtocol
+{
+  var eventHandler: ((VoiceResponsePlaybackEvent) -> Void)?
+
+  private let audioSession: AVAudioSession
+  private var player: AVAudioPlayer?
+
+  init(audioSession: AVAudioSession = .sharedInstance()) {
+    self.audioSession = audioSession
+    super.init()
+  }
+
+  func play(responseAudio: VoiceResponseAudio) async throws {
+    guard responseAudio.contentType == "audio/wav" else {
+      let error = VoiceResponsePlaybackServiceError.unsupportedAudioFormat
+      eventHandler?(.stateChanged(.failed(error.errorDescription ?? "Playback failed.")))
+      throw error
+    }
+
+    await stopPlayback()
+
+    do {
+      try audioSession.setCategory(.playback, mode: .default, options: [])
+      try audioSession.setActive(true, options: [])
+
+      let player = try AVAudioPlayer(data: responseAudio.data)
+      player.delegate = self
+      player.prepareToPlay()
+
+      guard player.play() else {
+        throw VoiceResponsePlaybackServiceError.playbackFailed(
+          "Jarvis could not start playback for the response audio."
+        )
+      }
+
+      self.player = player
+      eventHandler?(.stateChanged(.playing))
+    } catch {
+      let message =
+        (error as? LocalizedError)?.errorDescription
+        ?? "Jarvis could not start playback for the response audio."
+      eventHandler?(.stateChanged(.failed(message)))
+      throw VoiceResponsePlaybackServiceError.playbackFailed(message)
+    }
+  }
+
+  func stopPlayback() async {
+    if let player {
+      player.stop()
+      self.player = nil
+    }
+
+    try? audioSession.setActive(false, options: [.notifyOthersOnDeactivation])
+    eventHandler?(.stateChanged(.idle))
+  }
+
+  nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+    Task { @MainActor [weak self] in
+      guard let self else {
+        return
+      }
+
+      self.player = nil
+      try? self.audioSession.setActive(false, options: [.notifyOthersOnDeactivation])
+      self.eventHandler?(.stateChanged(.idle))
+      _ = flag
+      _ = player
+    }
+  }
+
+  nonisolated func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+    Task { @MainActor [weak self] in
+      guard let self else {
+        return
+      }
+
+      self.player = nil
+      let message =
+        (error as? LocalizedError)?.errorDescription
+        ?? "Jarvis encountered an error while decoding the response audio."
+      self.eventHandler?(.stateChanged(.failed(message)))
+      _ = player
+    }
+  }
+}
+// swiftlint:enable opening_brace
+// swiftlint:enable file_length type_body_length

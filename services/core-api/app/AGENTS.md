@@ -27,3 +27,5 @@ Add pytest coverage in this boundary for:
 - Authorization parsing must follow HTTP semantics, including case-insensitive auth scheme handling.
 - Add or update tests for both success and failure contract shape whenever auth or dependency behavior changes.
 - Keep backend trace logs metadata-only by default; do not write raw audio bytes or transcript text into the local JSONL log.
+- Treat `/v1/voice/interactions` unsupported commands as successful contract responses, not route errors.
+- If TTS fails inside an interaction response, return text fields with `tts_status = failed` and null audio fields instead of raising a route error.

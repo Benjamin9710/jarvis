@@ -50,8 +50,8 @@ struct MissionControlView: View {
         }
 
         Text(
-          "Current frontend milestone: finalized clip capture, backend upload, "
-            + "offline transcription, and local mission-control rendering."
+          "Current frontend milestone: finalized clip capture, Jarvis-style command response, "
+            + "local playback, and mission-control rendering."
         )
         .font(.system(.body, design: .rounded))
         .foregroundStyle(JarvisTheme.textSecondary)
@@ -102,11 +102,58 @@ struct MissionControlView: View {
   }
 
   private var transcriptPanel: some View {
-    HUDPanel(title: viewModel.transcriptPanelTitle) {
-      Text(viewModel.transcriptText)
-        .font(.system(.body, design: .rounded))
-        .foregroundStyle(JarvisTheme.textPrimary)
-        .fixedSize(horizontal: false, vertical: true)
+    HUDPanel(title: viewModel.responsePanelTitle) {
+      VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 6) {
+          Text("Summary")
+            .font(.system(.caption, design: .monospaced).weight(.semibold))
+            .foregroundStyle(JarvisTheme.textSecondary)
+            .kerning(1.2)
+
+          Text(viewModel.responseSummaryText)
+            .font(.system(.title3, design: .rounded).weight(.bold))
+            .foregroundStyle(JarvisTheme.textPrimary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+
+        if let spokenResponseText = viewModel.spokenResponseText {
+          VStack(alignment: .leading, spacing: 6) {
+            Text("Spoken Response")
+              .font(.system(.caption, design: .monospaced).weight(.semibold))
+              .foregroundStyle(JarvisTheme.textSecondary)
+              .kerning(1.2)
+
+            Text(spokenResponseText)
+              .font(.system(.body, design: .rounded))
+              .foregroundStyle(JarvisTheme.textPrimary)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+        }
+
+        if viewModel.shouldShowTranscript {
+          VStack(alignment: .leading, spacing: 6) {
+            Text("Transcript")
+              .font(.system(.caption, design: .monospaced).weight(.semibold))
+              .foregroundStyle(JarvisTheme.textSecondary)
+              .kerning(1.2)
+
+            Text(viewModel.transcriptText)
+              .font(.system(.body, design: .rounded))
+              .foregroundStyle(JarvisTheme.textPrimary)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+        }
+
+        if viewModel.shouldShowReplayButton {
+          Button(action: viewModel.handleReplayAction) {
+            Text(viewModel.replayButtonTitle)
+              .font(.system(.subheadline, design: .rounded).weight(.bold))
+              .frame(maxWidth: .infinity)
+          }
+          .buttonStyle(JarvisPrimaryButtonStyle(tone: JarvisTheme.accentMuted))
+          .accessibilityIdentifier("replay-response-button")
+        }
+      }
     }
   }
 
@@ -121,6 +168,10 @@ struct MissionControlView: View {
         HStack(spacing: 12) {
           MetricCard(label: "Microphone", value: viewModel.permissionLabel)
           MetricCard(label: "Voice Link", value: viewModel.networkLabel)
+        }
+
+        HStack(spacing: 12) {
+          MetricCard(label: "Playback", value: viewModel.playbackLabel)
         }
       }
     }
@@ -142,11 +193,11 @@ struct MissionControlView: View {
   }
 
   private var statusTone: Color {
-    if viewModel.transcriptionState.isInFlight {
+    if viewModel.interactionState.isInFlight {
       return JarvisTheme.warning
     }
 
-    if case .failed = viewModel.transcriptionState {
+    if case .failed = viewModel.interactionState {
       return JarvisTheme.error
     }
 

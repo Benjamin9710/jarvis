@@ -9,6 +9,7 @@ This is the first implemented backend contract in the voice pipeline.
 - Scope: transcription only
 - Out of scope: intent parsing, device routing, text-to-speech
 - The iPhone app now uses this contract for its post-capture upload flow.
+- The higher-level Jarvis response flow now lives in `voice-interaction.md`.
 
 ## Endpoint
 

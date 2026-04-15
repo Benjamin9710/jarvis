@@ -8,7 +8,8 @@ final class VoiceCaptureViewModelTests: XCTestCase {
     let service = MockVoiceCaptureService(permissionState: .unknown, initialState: .idle)
     let viewModel = VoiceCaptureViewModel(
       service: service,
-      transcriptionClient: MockBackendTranscriptionClient(delayNanoseconds: 0),
+      interactionClient: MockBackendTranscriptionClient(delayNanoseconds: 0),
+      playbackService: MockVoiceResponsePlaybackService(),
       backendConfiguration: nil
     )
 
@@ -26,7 +27,8 @@ final class VoiceCaptureViewModelTests: XCTestCase {
     )
     let viewModel = VoiceCaptureViewModel(
       service: service,
-      transcriptionClient: MockBackendTranscriptionClient(delayNanoseconds: 0),
+      interactionClient: MockBackendTranscriptionClient(delayNanoseconds: 0),
+      playbackService: MockVoiceResponsePlaybackService(),
       backendConfiguration: BackendConfiguration(
         baseURL: URL(string: "http://jarvis.local")!,
         bearerToken: "test-token",
@@ -41,12 +43,14 @@ final class VoiceCaptureViewModelTests: XCTestCase {
     XCTAssertEqual(viewModel.captureState, .recording)
   }
 
-  func testStoppingCaptureUploadsClipAndRendersTranscript() async {
+  func testStoppingCaptureUploadsClipAndRendersResponseAndPlayback() async {
     let service = MockVoiceCaptureService(permissionState: .granted, initialState: .ready)
-    let transcriptionClient = MockBackendTranscriptionClient(delayNanoseconds: 0)
+    let interactionClient = MockBackendTranscriptionClient(delayNanoseconds: 0)
+    let playbackService = MockVoiceResponsePlaybackService()
     let viewModel = VoiceCaptureViewModel(
       service: service,
-      transcriptionClient: transcriptionClient,
+      interactionClient: interactionClient,
+      playbackService: playbackService,
       backendConfiguration: BackendConfiguration(
         baseURL: URL(string: "http://jarvis.local")!,
         bearerToken: "test-token",
@@ -62,23 +66,32 @@ final class VoiceCaptureViewModelTests: XCTestCase {
     XCTAssertEqual(viewModel.captureState, .ready)
     XCTAssertEqual(viewModel.audioLevel, .silent)
     XCTAssertEqual(
-      viewModel.transcriptionState,
+      viewModel.interactionState,
       .succeeded(
-        BackendTranscriptionResult(
-          requestID: transcriptionClient.requestIDs[0],
+        BackendVoiceInteractionResult(
+          requestID: interactionClient.requestIDs[0],
           transcriptText: "Turn on the kitchen lights",
           normalizedText: "turn on the kitchen lights",
-          language: "en",
-          durationMS: 1000,
-          provider: "mock-backend",
-          confidence: nil
+          commandStatus: "succeeded",
+          commandAction: "turn_on",
+          commandTarget: "kitchen",
+          summaryText: "Kitchen lights turned on",
+          spokenText: "Certainly. The kitchen lights are now on.",
+          responseAudioBase64: Data("mock-audio".utf8).base64EncodedString(),
+          responseAudioContentType: "audio/wav",
+          responseAudioSampleRateHZ: 24_000,
+          sttProvider: "mock-backend",
+          ttsProvider: "mock-tts",
+          ttsStatus: "succeeded"
         )
       )
     )
+    XCTAssertEqual(viewModel.responseSummaryText, "Kitchen lights turned on")
     XCTAssertEqual(viewModel.transcriptText, "Turn on the kitchen lights")
+    XCTAssertEqual(playbackService.playedResponses.count, 1)
     XCTAssertFalse(
       FileManager.default.fileExists(
-        atPath: transcriptionClient.uploadedClipURLs[0].path
+        atPath: interactionClient.uploadedClipURLs[0].path
       )
     )
   }
@@ -91,7 +104,8 @@ final class VoiceCaptureViewModelTests: XCTestCase {
     )
     let viewModel = VoiceCaptureViewModel(
       service: service,
-      transcriptionClient: MockBackendTranscriptionClient(delayNanoseconds: 0),
+      interactionClient: MockBackendTranscriptionClient(delayNanoseconds: 0),
+      playbackService: MockVoiceResponsePlaybackService(),
       backendConfiguration: BackendConfiguration(
         baseURL: URL(string: "http://jarvis.local")!,
         bearerToken: "test-token",
@@ -108,10 +122,11 @@ final class VoiceCaptureViewModelTests: XCTestCase {
 
   func testStopCaptureWithoutBackendConfigurationShowsDeterministicErrorAndDeletesClip() async {
     let service = MockVoiceCaptureService(permissionState: .granted, initialState: .ready)
-    let transcriptionClient = MockBackendTranscriptionClient(delayNanoseconds: 0)
+    let interactionClient = MockBackendTranscriptionClient(delayNanoseconds: 0)
     let viewModel = VoiceCaptureViewModel(
       service: service,
-      transcriptionClient: transcriptionClient,
+      interactionClient: interactionClient,
+      playbackService: MockVoiceResponsePlaybackService(),
       backendConfiguration: nil
     )
 
@@ -120,7 +135,7 @@ final class VoiceCaptureViewModelTests: XCTestCase {
     await viewModel.handlePrimaryActionAsync()
 
     XCTAssertEqual(
-      viewModel.transcriptionState,
+      viewModel.interactionState,
       .failed(
         """
         Backend link is not configured. Add JARVIS_CORE_API_BASE_URL and \
@@ -128,6 +143,30 @@ final class VoiceCaptureViewModelTests: XCTestCase {
         """
       )
     )
-    XCTAssertTrue(transcriptionClient.requestIDs.isEmpty)
+    XCTAssertTrue(interactionClient.requestIDs.isEmpty)
+  }
+
+  func testSuccessfulInteractionWithoutAudioKeepsTextAndReplayHidden() async {
+    let service = MockVoiceCaptureService(permissionState: .granted, initialState: .ready)
+    let interactionClient = MockBackendTranscriptionClient(scenario: .missingAudio)
+    let playbackService = MockVoiceResponsePlaybackService()
+    let viewModel = VoiceCaptureViewModel(
+      service: service,
+      interactionClient: interactionClient,
+      playbackService: playbackService,
+      backendConfiguration: BackendConfiguration(
+        baseURL: URL(string: "http://jarvis.local")!,
+        bearerToken: "test-token",
+        deviceName: "CI iPhone"
+      )
+    )
+
+    await viewModel.prepare()
+    await viewModel.handlePrimaryActionAsync()
+    await viewModel.handlePrimaryActionAsync()
+
+    XCTAssertEqual(viewModel.responseSummaryText, "Kitchen lights turned on")
+    XCTAssertFalse(viewModel.shouldShowReplayButton)
+    XCTAssertTrue(playbackService.playedResponses.isEmpty)
   }
 }

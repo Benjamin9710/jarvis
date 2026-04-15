@@ -6,18 +6,19 @@ enum AppEnvironment {
   static func makeRootViewModel() -> VoiceCaptureViewModel {
     let processInfo = ProcessInfo.processInfo
     let captureService = makeVoiceCaptureService(processInfo: processInfo)
-    let transcriptionScenario = transcriptionScenario(from: processInfo)
+    let interactionScenario = interactionScenario(from: processInfo)
     let backendConfiguration = makeBackendConfiguration(
       processInfo: processInfo,
-      transcriptionScenario: transcriptionScenario
+      interactionScenario: interactionScenario
     )
 
     return VoiceCaptureViewModel(
       service: captureService,
-      transcriptionClient: makeTranscriptionClient(
+      interactionClient: makeInteractionClient(
         processInfo: processInfo,
-        transcriptionScenario: transcriptionScenario
+        interactionScenario: interactionScenario
       ),
+      playbackService: makePlaybackService(processInfo: processInfo),
       backendConfiguration: backendConfiguration
     )
   }
@@ -25,7 +26,8 @@ enum AppEnvironment {
   static func makePreviewViewModel(scenario: AppCaptureScenario) -> VoiceCaptureViewModel {
     VoiceCaptureViewModel(
       service: MockVoiceCaptureService(scenario: scenario),
-      transcriptionClient: MockBackendTranscriptionClient(scenario: .success),
+      interactionClient: MockBackendTranscriptionClient(scenario: .success),
+      playbackService: MockVoiceResponsePlaybackService(),
       backendConfiguration: BackendConfiguration(
         baseURL: URL(string: "http://jarvis.local")!,
         bearerToken: "preview-token",
@@ -65,11 +67,17 @@ enum AppEnvironment {
     return .ready
   }
 
-  private static func transcriptionScenario(
+  private static func interactionScenario(
     from processInfo: ProcessInfo
-  ) -> AppTranscriptionScenario {
+  ) -> AppInteractionScenario {
+    if let rawValue = processInfo.environment["JARVIS_INTERACTION_SCENARIO"] {
+      if let scenario = AppInteractionScenario(rawValue: rawValue) {
+        return scenario
+      }
+    }
+
     if let rawValue = processInfo.environment["JARVIS_TRANSCRIPTION_SCENARIO"] {
-      if let scenario = AppTranscriptionScenario(rawValue: rawValue) {
+      if let scenario = AppInteractionScenario(rawValue: rawValue) {
         return scenario
       }
     }
@@ -77,23 +85,33 @@ enum AppEnvironment {
     return .success
   }
 
-  private static func makeTranscriptionClient(
+  private static func makeInteractionClient(
     processInfo: ProcessInfo,
-    transcriptionScenario: AppTranscriptionScenario
-  ) -> any BackendTranscriptionClientProtocol {
+    interactionScenario: AppInteractionScenario
+  ) -> any BackendVoiceInteractionClientProtocol {
     guard isUITestRun(processInfo) else {
       return BackendTranscriptionClient()
     }
 
-    return MockBackendTranscriptionClient(scenario: transcriptionScenario)
+    return MockBackendTranscriptionClient(scenario: interactionScenario)
+  }
+
+  private static func makePlaybackService(
+    processInfo: ProcessInfo
+  ) -> any VoiceResponsePlaybackServiceProtocol {
+    guard isUITestRun(processInfo) else {
+      return VoiceResponsePlaybackService()
+    }
+
+    return MockVoiceResponsePlaybackService()
   }
 
   private static func makeBackendConfiguration(
     processInfo: ProcessInfo,
-    transcriptionScenario: AppTranscriptionScenario
+    interactionScenario: AppInteractionScenario
   ) -> BackendConfiguration? {
     if isUITestRun(processInfo) {
-      guard transcriptionScenario != .misconfigured else {
+      guard interactionScenario != .misconfigured else {
         return nil
       }
 

@@ -45,6 +45,22 @@ enum VoiceCaptureEvent: Equatable {
   case levelChanged(VoiceCaptureLevel)
 }
 
+struct VoiceResponseAudio: Equatable {
+  let data: Data
+  let contentType: String
+  let sampleRateHZ: Int?
+}
+
+enum VoiceResponsePlaybackState: Equatable {
+  case idle
+  case playing
+  case failed(String)
+}
+
+enum VoiceResponsePlaybackEvent: Equatable {
+  case stateChanged(VoiceResponsePlaybackState)
+}
+
 @MainActor
 protocol VoiceCaptureServiceProtocol: AnyObject {
   var eventHandler: ((VoiceCaptureEvent) -> Void)? { get set }
@@ -54,4 +70,12 @@ protocol VoiceCaptureServiceProtocol: AnyObject {
   func requestPermission() async -> VoiceCapturePermissionState
   func startCapture() async throws
   func stopCapture() async throws -> RecordedAudioClip?
+}
+
+@MainActor
+protocol VoiceResponsePlaybackServiceProtocol: AnyObject {
+  var eventHandler: ((VoiceResponsePlaybackEvent) -> Void)? { get set }
+
+  func play(responseAudio: VoiceResponseAudio) async throws
+  func stopPlayback() async
 }

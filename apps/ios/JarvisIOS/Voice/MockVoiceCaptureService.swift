@@ -129,3 +129,28 @@ final class MockVoiceCaptureService: VoiceCaptureServiceProtocol {
     }
   }
 }
+
+@MainActor
+final class MockVoiceResponsePlaybackService: VoiceResponsePlaybackServiceProtocol {
+  var eventHandler: ((VoiceResponsePlaybackEvent) -> Void)?
+  var shouldFail = false
+
+  private(set) var playedResponses: [VoiceResponseAudio] = []
+
+  func play(responseAudio: VoiceResponseAudio) async throws {
+    playedResponses.append(responseAudio)
+
+    if shouldFail {
+      let message = "Jarvis could not play the response audio in the test fixture."
+      eventHandler?(.stateChanged(.failed(message)))
+      throw VoiceResponsePlaybackServiceError.playbackFailed(message)
+    }
+
+    eventHandler?(.stateChanged(.playing))
+    eventHandler?(.stateChanged(.idle))
+  }
+
+  func stopPlayback() async {
+    eventHandler?(.stateChanged(.idle))
+  }
+}

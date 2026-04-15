@@ -5,6 +5,14 @@ description = "Offline-first voice pipeline primitives for Jarvis."
 requires-python = ">=3.12"
 dependencies = []
 
+[project.optional-dependencies]
+xtts = [
+  "coqui-tts[codec]>=0.27,<0.28",
+  "torch>=2.11,<3",
+  "torchaudio>=2.11,<3",
+  "transformers>=4.57,<5",
+]
+
 [dependency-groups]
 dev = [
   "pyright>=1.1.408,<2",

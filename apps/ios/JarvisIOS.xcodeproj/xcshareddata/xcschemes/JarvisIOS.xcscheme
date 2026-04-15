@@ -82,7 +82,7 @@
       <EnvironmentVariables>
          <EnvironmentVariable
             key = "JARVIS_CORE_API_BASE_URL"
-            value = "http://192.168.0.173:8010"
+            value = "http://192.168.0.74:8010"
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable

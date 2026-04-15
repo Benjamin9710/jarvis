@@ -27,6 +27,12 @@ preserve_env_overrides() {
     JARVIS_CORE_API_HOST_PORT \
     JARVIS_API_BEARER_TOKEN \
     JARVIS_STT_PROVIDER \
+    JARVIS_TTS_PROVIDER \
+    JARVIS_TTS_MODEL_NAME \
+    JARVIS_TTS_DEVICE \
+    JARVIS_TTS_SPEAKER \
+    JARVIS_TTS_LANGUAGE \
+    JARVIS_TTS_CACHE_DIR \
     JARVIS_WHISPER_CPP_VERSION \
     JARVIS_WHISPER_CPP_MODEL \
     JARVIS_WHISPER_CPP_BINARY_PATH \
@@ -48,6 +54,12 @@ restore_env_overrides() {
     JARVIS_CORE_API_HOST_PORT \
     JARVIS_API_BEARER_TOKEN \
     JARVIS_STT_PROVIDER \
+    JARVIS_TTS_PROVIDER \
+    JARVIS_TTS_MODEL_NAME \
+    JARVIS_TTS_DEVICE \
+    JARVIS_TTS_SPEAKER \
+    JARVIS_TTS_LANGUAGE \
+    JARVIS_TTS_CACHE_DIR \
     JARVIS_WHISPER_CPP_VERSION \
     JARVIS_WHISPER_CPP_MODEL \
     JARVIS_WHISPER_CPP_BINARY_PATH \
@@ -71,6 +83,7 @@ restore_env_overrides
 HOST_PORT="${JARVIS_CORE_API_HOST_PORT:-8010}"
 API_BASE_URL="http://127.0.0.1:${HOST_PORT}"
 TOKEN="${JARVIS_API_BEARER_TOKEN:-change-me}"
+TTS_PROVIDER="${JARVIS_TTS_PROVIDER:-xtts}"
 BACKEND_LOG_DIR="${JARVIS_BACKEND_LOG_DIR:-$ROOT_DIR/.artifacts/logs/backend}"
 if [[ "$BACKEND_LOG_DIR" != /* ]]; then
   BACKEND_LOG_DIR="$SERVICE_DIR/$BACKEND_LOG_DIR"
@@ -89,7 +102,9 @@ rm -rf "$BACKEND_LOG_DIR"
 mkdir -p "$BACKEND_LOG_DIR"
 
 cd "$SERVICE_DIR"
-JARVIS_BACKEND_LOG_DIR="$DOCKER_BACKEND_LOG_DIR" docker compose up --build -d
+JARVIS_BACKEND_LOG_DIR="$DOCKER_BACKEND_LOG_DIR" \
+JARVIS_TTS_PROVIDER="$TTS_PROVIDER" \
+docker compose up --build -d
 
 for _attempt in $(seq 1 60); do
   status_code="$(curl -s -o /dev/null -w "%{http_code}" "$API_BASE_URL/healthz" || true)"
@@ -186,5 +201,26 @@ if payload["message"] != "v1 only accepts WAV uploads.":
 if not payload.get("request_id"):
     raise SystemExit(f"missing request_id in invalid-media payload: {payload}")
 ' "$invalid_body"
+
+interaction_body="$(curl -sS -X POST "$API_BASE_URL/v1/voice/interactions" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "audio_file=@${FIXTURE_PATH};type=audio/wav" \
+  -F "client_request_id=live-interaction-check" \
+  -F "device_name=docker-integration")"
+
+python3 -c '
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+if payload["request_id"] != "live-interaction-check":
+    raise SystemExit(f"unexpected request_id: {payload}")
+if payload["command_status"] != "unsupported":
+    raise SystemExit(f"unexpected command_status: {payload}")
+if payload["summary_text"] != "Command not available":
+    raise SystemExit(f"unexpected summary_text: {payload}")
+if payload["tts_status"] not in {"succeeded", "failed"}:
+    raise SystemExit(f"unexpected tts_status: {payload}")
+' "$interaction_body"
 
 echo "Live HTTP integration checks passed."

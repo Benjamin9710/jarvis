@@ -5,7 +5,7 @@ description = "Local FastAPI entrypoint for Jarvis voice transcription."
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1",
-  "jarvis-voice",
+  "jarvis-voice[xtts]",
   "pydantic-settings>=2.8,<3",
   "python-multipart>=0.0.9,<1",
   "uvicorn>=0.34,<1",

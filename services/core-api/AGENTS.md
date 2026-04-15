@@ -4,7 +4,7 @@
 `services/core-api` is the Python orchestration boundary for local HTTP/WebSocket entrypoints.
 
 ## Current State
-This boundary now contains the first runnable Python API scaffold for local voice transcription.
+This boundary now contains runnable local voice transcription plus the first interaction endpoint for Jarvis-style responses.
 
 ## Planned Responsibilities
 - Serve local API and event endpoints.
@@ -28,7 +28,7 @@ Run from `services/core-api`:
 
 - `cp .env.template .env`
 - `python3 -m venv ../../.venv`
-- `../../.venv/bin/python -m pip install -e ../voice -e . pyright pytest`
+- `../../.venv/bin/python -m pip install -e '../voice[xtts]' -e . pyright pytest`
 - `bash scripts/check-python.sh`
 - `bash scripts/check-python-live.sh`
 - `uv sync --group dev`
@@ -39,4 +39,6 @@ Run from `services/core-api`:
 Docker defaults to host port `8010` via `JARVIS_CORE_API_HOST_PORT` while the container still listens on `8000`.
 The Docker image builds `whisper.cpp` plus the configured ggml model at image build time.
 When running through Docker Compose, backend trace logs are mounted back into repo-local `.artifacts/logs/backend`.
+The Docker Compose runtime also mounts the XTTS cache back into repo-local `.artifacts/models/xtts` so first-run model downloads persist across container restarts.
 For backend surface changes, done means both `bash scripts/check-python.sh` and a live HTTP integration run have passed.
+XTTS is configured through `JARVIS_TTS_*` settings, and the Docker integration path now defaults `JARVIS_TTS_PROVIDER` to `xtts` unless explicitly overridden.
